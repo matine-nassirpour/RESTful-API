@@ -1,5 +1,3 @@
-import {NULL} from "mysql/lib/protocol/constants/types";
-
 const
     express = require('express'),
     app = express(),
@@ -11,13 +9,18 @@ const
     QRCode = require('qrcode'),
     nodemailer = require('nodemailer'),
     PORT = 3000,
-    jwt = require('jsonwebtoken'),
-    uuid = require('uuid')
+    uuid = require('uuid'),
+    mysql = require('mysql'),
+    dotenv = require('dotenv').config()
+    formatDate = require('date-and-time')
 ;
 
-import { connection } from './db';
-
-require('dotenv').config();
+const connection = mysql.createConnection({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME
+});
 
 let
     productsImportedJson = [],
@@ -108,70 +111,35 @@ app.get('/customers/:email', (req, res) => {
     if (!customer) {
         res.status(400).json(customer)
     } else {
-        res.status(200).json(customer);
-
-
+        res.status(200).json(customer)
     }
 });
 
-
-
-
-
-
-
-
-const secretKey = 'bluelaggonousaphire';
-
-// Create and return a JWT token
-// function createToken(user) {
-//     return jwt.sign({id: user.id}, secretKey);
-// }
-
 // Create and return a unique URL with token
 function createAuthenticationUrl(user) {
-    // const token = createToken(user);
     const uuidToken = uuid.v4();
+    const now = new Date(Date.now())
+    const nowFormatted = formatDate.format(now, "YYYY-MM-DD HH:mm:ss")
+    console.log("now formatted time", nowFormatted)
+    // const expirationTime = new Date(now.setTime(now.getTime() + (1 * 60 * 60 * 1000)))
+    const expirationTime = new Date(now.setTime(now.getTime() + 120000))
+    console.log("Expiration time", expirationTime)
+    const expirationTimeFormatted = formatDate.format(expirationTime, "YYYY-MM-DD HH:mm:ss")
+    console.log("Expiration time formatted", expirationTimeFormatted)
 
     // Save the uuidToken to your user database, together with the user ID and expiration time
     connection.connect(function (err) {
        if (err) throw err;
-       console.log('Connected!');
 
-       const sql = "INSERT INTO token VALUES (DEFAULT, ?, ?, DEFAULT, 3600)";
+       const sql = "INSERT INTO token VALUES (DEFAULT, ?, ?, ?, ?)";
 
-       connection.query(sql, [uuidToken, user], function (err, result, fields) {
+       connection.query(sql, [uuidToken, user, nowFormatted, expirationTimeFormatted], function (err, result, fields) {
           if (err) throw err;
-          console.log(result)
        });
     });
 
-    return `https://localhost:3000/login/verification?uuid=${uuidToken}&user=${user}`;
+    return `http://localhost:3000/login/verification?uuid=${uuidToken}&user=${user}`;
 }
-
-// Middleware to verify JWT tokens
-function verifyToken(req, res, next) {
-    const token = req.headers.authorization;
-
-    if (!token) {
-        return res.status(401).json({ message: 'Missing authorization token' });
-    }
-
-    try {
-        const decoded = jwt.verify(token, secretKey);
-        req.userId = decoded.id;
-        next();
-    } catch (err) {
-        return res.status(401).json({ message: 'Invalid authorization token' });
-    }
-}
-
-
-
-
-
-
-
 
 // Endpoint to login and generate a token
 app.post('/login', (req, res) => {
@@ -179,12 +147,12 @@ app.post('/login', (req, res) => {
         const user = customersImportedJson.find(customer => customer.username === username);
 
         if (!user) {
-            res.status(400).json(user)
+            res.status(400).json("User not found")
         } else {
             res.status(200).json(user);
         }
 
-        return user;
+        return user.username;
     }
 
     // Authenticate user
@@ -192,15 +160,15 @@ app.post('/login', (req, res) => {
         email = req.body.email,
         parseEmail = email.split('@'),
         username = parseEmail[0],
-        user = authenticateUser(username)
+        userToAuthenticate = authenticateUser(username)
     ;
 
-    if (!user) {
+    if (!userToAuthenticate) {
         return res.status(401).json({ message: 'Invalid username'});
     }
 
     // Create unique URL with token
-    const authenticationUrl = createAuthenticationUrl(user);
+    const authenticationUrl = createAuthenticationUrl(userToAuthenticate);
 
     /**
      * create QRCode every time this endpoint is called
@@ -235,23 +203,34 @@ app.post('/login', (req, res) => {
     return res.json({ authenticationUrl })
 })
 
-app.get('/login/verification', /*verifyToken,*/ (req, res) => {
-    const user = req.query.username;
+app.get('/login/verification', (req, res) => {
+    const user = req.query.user;
     const uuid = req.query.uuid;
 
-    const sql = "SELECT * FROM token WHERE uuid_token = ?";
+    const tokenRequest = "SELECT * FROM token WHERE uuid_token = ?";
 
-    connection.query(sql, uuid, function (err, rows, fields) {
+    connection.query(tokenRequest, uuid, function (err, rows, fields) {
         if (err) throw err;
 
-        if (rows[1] === uuid && rows[2] === user) {
-            return res.status(200).json("User authenticated")
+        if (rows[0].uuid_token === uuid && rows[0].username === user) {
+
+            console.log("Token expiration time: ", (rows[0].expiration_time).valueOf())
+            console.log("Token creation date:", (rows[0].creation_date).valueOf())
+
+            const
+                expirationTime = rows[0].expiration_time,
+                creationDate = rows[0].creation_date
+            ;
+
+            if (creationDate.valueOf() < expirationTime.valueOf()) {
+                res.status(200).json("User authenticated");
+            } else {
+                return res.status(401).json("Token expired")
+            }
         } else {
-            return res.status(401).json("Something went wrong")
+            return res.status(401).json("You authentication token is not valid any more")
         }
     });
-
-    // return res.json({ user })
 })
 
 app.listen(3000, () => {
