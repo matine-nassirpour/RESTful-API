@@ -1,3 +1,5 @@
+import {NULL} from "mysql/lib/protocol/constants/types";
+
 const
     express = require('express'),
     app = express(),
@@ -9,47 +11,13 @@ const
     QRCode = require('qrcode'),
     nodemailer = require('nodemailer'),
     PORT = 3000,
-    jwt = require('jsonwebtoken')
+    jwt = require('jsonwebtoken'),
+    uuid = require('uuid')
 ;
 
-require('dotenv').config();
+import { connection } from './db';
 
-const privateKey = `-----BEGIN RSA PRIVATE KEY-----
-MIIEogIBAAKCAQBu/PPSM66u2L3FHBxUngwr5PV53kc7Tl7Xqo9Y27S2VvfHSYdC
-JD99Gbb8+MnljQmNRImcuSU3KFSPDAfZnztrO+aOQIM87QnIWb4rhxTc8LQKXHI1
-AswXR6xOBagLeCAS7GE01q70rLtDv9ulBrmx3TYbvIh7y5kMRib78wkbmhp54STA
-4PJyAGHwWWmpWsNnXAWA4KSyROP50C+ykIEYf5gZlXpLb1/wf1no/eC8Qb8QxQTV
-XUCi7slT8JycjxBIUx8ZAbThzZtRkxhwtiU912E9DFb6rvwcLq7FMPImR7tq0HN+
-u5cIIUugXaZt7Kltrtv5SEEQ+A80oWUS++/xAgMBAAECggEABCQBwKzW7oT9h3YG
-BI4k7BpNoi9NvwOsfCVL1cfUlRznf5LZrfkGOVeVQRjTB3Jckd2luKgboFQr225a
-eJ79K4H/lv0HKGW7gLMAakVO3PNJ9D0AscOZ86Bj6EFDxLHFmI8jDUKZIl2zWtK0
-khKPKPiUxTIicWPmINQZLjsh8tqfLFrZjpRhdxGPsGs+LoVHVafyg6O9Rd2R4kAZ
-Qj6f5NuIP6s8zUbaaT3DzyKOfBUthaNAXpGzBnjrNaU3a1IMyzBlDKEmXWczX482
-1/BjcDxcHvhUe8zIK40ePFZOmWbKQXaRai/XSHeLSs4sasP2Z4lmxQ16ZfdoSIrX
-bUMRQQKBgQDJvHvvcdcTZG/ZWuH2VepvTFNeV5kIAnpGj/DFFIsMFKFjBaTJVToL
-i0pXgYUqq7fHUSfxnJDRhmIK3S7C52KtC36ejrr0TqxQ/O/Bvk8kk2oiHj5FN95G
-U4uJBcliPP4rXlzIqTbWsMg7kYnMShBdTKqzNDvJvKPcNH5JjhXbmQKBgQCM15Gc
-myodg5AJDp2auB2F84f0XvdQS2W0/Zx1KAhf0ITHiXim2zse/JcBrobiz42sfGrr
-30UYS1ur30+3hKWEgh/CSpiGuHMxH0hPJGZwh0R6xEs/SxyEv2Spar9PccepXEEb
-uuWoVPUzaT4aVGc4mhLj7pcL22qvLyLL7wQuGQKBgQCbAlYknU+KmhELbTbVJh0V
-2grxIdP3gJfd4jo55NgWtz9uq+Z7wR3xwtyjsmTVbc6vu1862ne4V068VEna/xom
-Jv/q63chw9XKASBkuUtsqkzR3HUykIQde5Jq/eRItN8ECeS3VrZJbtrcUq8UJxC9
-7+v1+Lu7/lPWHwuujxuieQKBgAFAvavd+X7vt61M8vv4XVLeurviyGJveUUl6Glm
-ZMStbzDzOR6K3rjE2HcMXWjRHdqF9NGKV+wCZ5tczjG8vVgzbCLnVPoF1AiA1bzW
-fw7LNUG+U0kJ2wQXS8byCyeixHruNioP/JEFyHSfoAzN6WkofbiHW9KgLg/G5JFZ
-2/ipAoGAfWyufqTcbMqjShE0ZGITDzoRoCvZbKvsxAHefQT60FzjQ5sVOixvL3sm
-BL0XebjRdSgo1m9UROsUYMvrJB3mD/10Vnaloi5RDyozM/TvR6txgv3gTttJwmby
-bGVHvNjm6Cx5yVmFUTodkWt6XLVzkfY/ObRMWziEP5N/8SFXK1c=
------END RSA PRIVATE KEY-----`;
-const publicKey = `-----BEGIN PUBLIC KEY-----
-MIIBITANBgkqhkiG9w0BAQEFAAOCAQ4AMIIBCQKCAQBu/PPSM66u2L3FHBxUngwr
-5PV53kc7Tl7Xqo9Y27S2VvfHSYdCJD99Gbb8+MnljQmNRImcuSU3KFSPDAfZnztr
-O+aOQIM87QnIWb4rhxTc8LQKXHI1AswXR6xOBagLeCAS7GE01q70rLtDv9ulBrmx
-3TYbvIh7y5kMRib78wkbmhp54STA4PJyAGHwWWmpWsNnXAWA4KSyROP50C+ykIEY
-f5gZlXpLb1/wf1no/eC8Qb8QxQTVXUCi7slT8JycjxBIUx8ZAbThzZtRkxhwtiU9
-12E9DFb6rvwcLq7FMPImR7tq0HN+u5cIIUugXaZt7Kltrtv5SEEQ+A80oWUS++/x
-AgMBAAE=
------END PUBLIC KEY-----`;
+require('dotenv').config();
 
 let
     productsImportedJson = [],
@@ -131,10 +99,6 @@ app.get('/customers/:id/orders', (req, res) => {
     res.status(200).json(customer.orders);
 });
 
-app.listen(3000, () => {
-    console.log(`Server listening on port ${PORT}!`);
-});
-
 app.get('/customers/:email', (req, res) => {
     const
         email = req.params.email,
@@ -150,19 +114,98 @@ app.get('/customers/:email', (req, res) => {
     }
 });
 
+
+
+
+
+
+
+
+const secretKey = 'bluelaggonousaphire';
+
+// Create and return a JWT token
+// function createToken(user) {
+//     return jwt.sign({id: user.id}, secretKey);
+// }
+
+// Create and return a unique URL with token
+function createAuthenticationUrl(user) {
+    // const token = createToken(user);
+    const uuidToken = uuid.v4();
+
+    // Save the uuidToken to your user database, together with the user ID and expiration time
+    connection.connect(function (err) {
+       if (err) throw err;
+       console.log('Connected!');
+
+       const sql = "INSERT INTO token VALUES (DEFAULT, ?, ?, DEFAULT, 3600)";
+
+       connection.query(sql, [uuidToken, user], function (err, result, fields) {
+          if (err) throw err;
+          console.log(result)
+       });
+    });
+
+    return `https://localhost:3000/login/${uuidToken}`;
+}
+
+// Middleware to verify JWT tokens
+function verifyToken(req, res, next) {
+    const token = req.headers.authorization;
+
+    if (!token) {
+        return res.status(401).json({ message: 'Missing authorization token' });
+    }
+
+    try {
+        const decoded = jwt.verify(token, secretKey);
+        req.userId = decoded.id;
+        next();
+    } catch (err) {
+        return res.status(401).json({ message: 'Invalid authorization token' });
+    }
+}
+
+
+
+
+
+
+
+
+// Endpoint to login and generate a token
 app.post('/login', (req, res) => {
+    function authenticateUser(username) {
+        const user = customersImportedJson.find(customer => customer.username === username);
+
+        if (!user) {
+            res.status(400).json(user)
+        } else {
+            res.status(200).json(user);
+        }
+
+        return user;
+    }
+
+    // Authenticate user
     const
-        userEmail = req.body.username + "@payetoncawa.fr",
-        username = req.body.username
+        email = req.body.email,
+        parseEmail = email.split('@'),
+        username = parseEmail[0],
+        user = authenticateUser(username)
     ;
 
+    if (!user) {
+        return res.status(401).json({ message: 'Invalid username'});
+    }
 
-    const token = jwt.sign({username}, privateKey, {algorithm: 'RS256'})
+    // Create unique URL with token
+    const authenticationUrl = createAuthenticationUrl(user);
 
     /**
      * create QRCode every time this endpoint is called
      */
-    QRCode.toDataURL("https://615f5fb4f7254d0017068109.mockapi.io/api/v1/customers", function (err, qrCode) {
+    QRCode.toDataURL("http://localhost:3000/login/verification", function (err, qrCode) {
         let transporter = nodemailer.createTransport({
             service: process.env.EMAIL_HOST,
             port: process.env.PORT,
@@ -174,7 +217,7 @@ app.post('/login', (req, res) => {
 
         let mailOptions = {
             from: 'matin.nasirpour@epsi.fr',
-            to: ['matin.nasirpour@epsi.fr', userEmail],
+            to: ['matin.nasirpour@epsi.fr', email],
             subject: `Sending Email using Nodemailer`,
             html: '<img src="'+ qrCode + '" alt="missing qr code">'
         };
@@ -188,10 +231,29 @@ app.post('/login', (req, res) => {
         });
     })
 
-    // Verify the user existence
-    if (username) {
-        res.send(token)
-    } else {
-        res.status(404).send("No user found!")
-    }
+    // Return authentication URL
+    return res.json({ authenticationUrl })
 })
+
+app.get('/login/verification', /*verifyToken,*/ (req, res) => {
+    const user = req.query.username;
+    const uuid = req.query.uuid;
+
+    const sql = "SELECT * FROM token WHERE uuid_token = ?";
+
+    connection.query(sql, uuid, function (err, rows, fields) {
+        if (err) throw err;
+
+        if (rows[1] === uuid && rows[2] === user) {
+            return res.status(200).json("User authenticated")
+        } else {
+            return res.status(401).json("Something went wrong")
+        }
+    });
+
+    // return res.json({ user })
+})
+
+app.listen(3000, () => {
+    console.log(`Server listening on port ${PORT}!`);
+});
