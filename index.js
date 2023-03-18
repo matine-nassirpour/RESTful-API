@@ -146,7 +146,7 @@ function createAuthenticationUrl(user) {
        });
     });
 
-    return `https://localhost:3000/login/${uuidToken}`;
+    return `https://localhost:3000/login/verification?uuid=${uuidToken}&user=${user}`;
 }
 
 // Middleware to verify JWT tokens
@@ -205,7 +205,7 @@ app.post('/login', (req, res) => {
     /**
      * create QRCode every time this endpoint is called
      */
-    QRCode.toDataURL("http://localhost:3000/login/verification", function (err, qrCode) {
+    QRCode.toDataURL(authenticationUrl, function (err, qrCode) {
         let transporter = nodemailer.createTransport({
             service: process.env.EMAIL_HOST,
             port: process.env.PORT,
