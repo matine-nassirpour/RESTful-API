@@ -12,6 +12,7 @@ const
     uuid = require('uuid'),
     mysql = require('mysql'),
     dotenv = require('dotenv').config()
+const {log} = require("qrcode/lib/core/galois-field");
     formatDate = require('date-and-time')
 ;
 
@@ -122,7 +123,7 @@ function createAuthenticationUrl(user) {
     const nowFormatted = formatDate.format(now, "YYYY-MM-DD HH:mm:ss")
     console.log("now formatted time", nowFormatted)
     // const expirationTime = new Date(now.setTime(now.getTime() + (1 * 60 * 60 * 1000)))
-    const expirationTime = new Date(now.setTime(now.getTime() + 120000))
+    const expirationTime = new Date(now.setTime(now.getTime() + 60000))
     console.log("Expiration time", expirationTime)
     const expirationTimeFormatted = formatDate.format(expirationTime, "YYYY-MM-DD HH:mm:ss")
     console.log("Expiration time formatted", expirationTimeFormatted)
@@ -207,29 +208,39 @@ app.get('/login/verification', (req, res) => {
     const user = req.query.user;
     const uuid = req.query.uuid;
 
-    const tokenRequest = "SELECT * FROM token WHERE uuid_token = ?";
+    const tokenRequest = "SELECT * FROM token WHERE username = ?";
 
-    connection.query(tokenRequest, uuid, function (err, rows, fields) {
-        if (err) throw err;
-
-        if (rows[0].uuid_token === uuid && rows[0].username === user) {
-
-            console.log("Token expiration time: ", (rows[0].expiration_time).valueOf())
-            console.log("Token creation date:", (rows[0].creation_date).valueOf())
-
-            const
-                expirationTime = rows[0].expiration_time,
-                creationDate = rows[0].creation_date
-            ;
-
-            if (creationDate.valueOf() < expirationTime.valueOf()) {
-                res.status(200).json("User authenticated");
-            } else {
-                return res.status(401).json("Token expired")
-            }
-        } else {
-            return res.status(401).json("You authentication token is not valid any more")
+    connection.query(tokenRequest, user, function (err, rows, fields) {
+        if (err) {
+            console.log("[mysql error]", err.stack);
         }
+
+        if (rows.length === 0) {
+            return res.status(401).json("Invalid credentials")
+        } else {
+            if (rows[0].uuid_token === uuid && rows[0].username === user) {
+
+                const formatedExpiration = formatDate.format(rows[0].expiration_time, "YYYY-MM-DD HH:mm:ss")
+                const formatedCreation = formatDate.format(rows[0].creation_date, "YYYY-MM-DD HH:mm:ss")
+                console.log("Token expiration time: ", (rows[0].expiration_time).valueOf())
+                console.log("Token expiration time: ", formatedExpiration)
+                console.log("Token creation date:", (rows[0].creation_date).valueOf())
+                console.log("Token creation date:", formatedCreation)
+
+                const
+                    expirationTime = rows[0].expiration_time,
+                    creationDate = rows[0].creation_date
+                ;
+
+                if (creationDate.valueOf() < expirationTime.valueOf()) {
+                    res.status(200).json("User authenticated");
+                } else {
+                    return res.status(401).json("Token expired")
+                }
+            }
+        }
+
+        connection.end();
     });
 })
 
