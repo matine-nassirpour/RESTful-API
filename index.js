@@ -121,12 +121,9 @@ function createAuthenticationUrl(user) {
     const uuidToken = uuid.v4();
     const now = new Date(Date.now())
     const nowFormatted = formatDate.format(now, "YYYY-MM-DD HH:mm:ss")
-    console.log("now formatted time", nowFormatted)
     // const expirationTime = new Date(now.setTime(now.getTime() + (1 * 60 * 60 * 1000)))
     const expirationTime = new Date(now.setTime(now.getTime() + 60000))
-    console.log("Expiration time", expirationTime)
     const expirationTimeFormatted = formatDate.format(expirationTime, "YYYY-MM-DD HH:mm:ss")
-    console.log("Expiration time formatted", expirationTimeFormatted)
 
     // Save the uuidToken to your user database, together with the user ID and expiration time
     connection.connect(function (err) {
@@ -219,13 +216,6 @@ app.get('/login/verification', (req, res) => {
             return res.status(401).json("Invalid credentials")
         } else {
             if (rows[0].uuid_token === uuid && rows[0].username === user) {
-
-                const formatedExpiration = formatDate.format(rows[0].expiration_time, "YYYY-MM-DD HH:mm:ss")
-                const formatedCreation = formatDate.format(rows[0].creation_date, "YYYY-MM-DD HH:mm:ss")
-                console.log("Token expiration time: ", (rows[0].expiration_time).valueOf())
-                console.log("Token expiration time: ", formatedExpiration)
-                console.log("Token creation date:", (rows[0].creation_date).valueOf())
-                console.log("Token creation date:", formatedCreation)
 
                 const
                     expirationTime = rows[0].expiration_time,
