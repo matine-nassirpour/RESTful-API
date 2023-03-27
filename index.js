@@ -223,8 +223,17 @@ app.get('/login/verification', (req, res) => {
                 ;
 
                 if (creationDate.valueOf() < expirationTime.valueOf()) {
+                    //write uuid to session_token table
+                    const now = new Date(Date.now())
+                    const nowFormatted = formatDate.format(now, "YYYY-MM-DD HH:mm:ss")
+                    const expirationTime = new Date(now.setTime(now.getTime() + 60000))
+                    const expirationTimeFormatted = formatDate.format(expirationTime, "YYYY-MM-DD HH:mm:ss")
+                    connection.query("INSERT INTO session_token VALUES ( ?, ?, ?)", [uuid, nowFormatted, expirationTimeFormatted], function (err, rows, fields) {
+                        if (err) {
+                            console.log("[mysql error]", err.stack);
+                        }});
                     res.status(200).json("User authenticated");
-                } else {
+                }else {
                     return res.status(401).json("Token expired")
                 }
             }
@@ -233,6 +242,36 @@ app.get('/login/verification', (req, res) => {
         connection.end();
     });
 })
+
+function checkSessionToken(uuid) {
+
+    const tokenRequest = "SELECT * FROM session_token WHERE uuid_token = ?";
+
+    connection.query(tokenRequest, uuid, function (err, rows, fields) {
+        if (err) {
+            console.log("[mysql error]", err.stack);
+        }
+
+        if (rows.length === 0) {
+            return false;
+        } else {
+            if (rows[0].uuid_token === uuid) {
+
+                const
+                    expirationTime = rows[0].expiration_time,
+                    creationDate = rows[0].creation_date
+                ;
+
+                if (creationDate.valueOf() < expirationTime.valueOf()) {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        }
+    });
+
+}
 
 app.listen(3000, () => {
     console.log(`Server listening on port ${PORT}!`);
