@@ -136,7 +136,7 @@ function createAuthenticationUrl(user) {
        });
     });
 
-    return `http://localhost:3000/login/verification?uuid=${uuidToken}&user=${user}`;
+    return `http://10.60.121.88:3000/login/verification?uuid=${uuidToken}&user=${user}`;
 }
 
 // Endpoint to login and generate a token
