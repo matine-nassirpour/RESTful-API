@@ -240,14 +240,11 @@ app.get('/login/verification', (req, res) => {
 function checkSessionToken(uuid) {
 
     const tokenRequest = "SELECT * FROM session_token WHERE uuid_token = ?";
+    let bool = false;
 
     connection.query(tokenRequest, uuid, function (err, rows, fields) {
-        if (err) {
-            return Boolean(false);
-        }
-
         if (rows.length === 0) {
-            return Boolean(false);
+            bool = false;
         } else {
             if (rows[0].uuid_token === uuid) {
 
@@ -255,11 +252,16 @@ function checkSessionToken(uuid) {
                     expirationTime = rows[0].expiration_time,
                     creationDate = rows[0].creation_date;
 
-                return Boolean(creationDate.valueOf() < expirationTime.valueOf());
+                if (creationDate.valueOf() < expirationTime.valueOf())
+                {
+                    bool = true;
+                };
             }
-        }}
-        )
+        }
 
+    }
+        )
+    return bool;
 }
 
 
