@@ -59,29 +59,40 @@ app.get('/', (req, res) => {
 });
 
 app.get('/products', (req, res) => {
-    if (checkSessionToken(req.body.uuid)) {
-        return;
+    const uuid = req.query.uuid;
+
+    if (checkSessionToken(uuid)) {
+        res.status(200).json(productsImportedJson);
+    } else {
+        res.status(401).json("Not authenticated")
     }
-    res.status(200).json(productsImportedJson);
 });
 
 app.get('/products/:id', (req, res) => {
-    if (checkSessionToken(req.body.uuid)) {
+    const uuid = req.query.uuid;
+
+    if (checkSessionToken(uuid)) {
         const
             id = req.params.id,
             product = productsImportedJson.find(product => product.id === id)
         ;
         res.status(200).json(product);
+    } else {
+        res.status(401).json("Not authenticated")
+        console.log(uuid)
     }
 });
 
 app.get('/products/:id/stock', (req, res) => {
-    const
-        id = req.params.id,
-        product = productsImportedJson.find(product => product.id === id)
-    ;
 
-    res.status(200).json(product.stock);
+    if (checkSessionToken(req.query.uuid)) {
+        const
+            id = req.params.id,
+            product = productsImportedJson.find(product => product.id === id)
+        ;
+
+        res.status(200).json(product.stock);
+    }
 });
 
 app.get('/customers', (req, res) => {
@@ -222,11 +233,11 @@ app.get('/login/verification', (req, res) => {
                     const nowFormatted = formatDate.format(now, "YYYY-MM-DD HH:mm:ss")
                     const expirationTime = new Date(now.setTime(now.getTime() + 60000))
                     const expirationTimeFormatted = formatDate.format(expirationTime, "YYYY-MM-DD HH:mm:ss")
-                    connection.query("INSERT INTO session_token VALUES ( ?, ?, ?)", [uuid, nowFormatted, expirationTimeFormatted], function (err, rows, fields) {
+                    connection.query("INSERT INTO session_token VALUES (?, ?, ?)", [uuid, nowFormatted, expirationTimeFormatted], function (err, rows, fields) {
                         if (err) {
                             console.log("[mysql error]", err.stack);
                         }});
-                    res.status(200).json("User authenticated");
+                    res.status(200).json(uuid);
 
                 }else {
                     return res.status(401).json("Token expired")
@@ -255,7 +266,7 @@ function checkSessionToken(uuid) {
                 if (creationDate.valueOf() < expirationTime.valueOf())
                 {
                     bool = true;
-                };
+                }
             }
         }
 
