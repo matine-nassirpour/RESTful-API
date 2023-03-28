@@ -10,10 +10,9 @@ const
     nodemailer = require('nodemailer'),
     PORT = 3000,
     uuid = require('uuid'),
-    mysql = require('mysql'),
+    mysql = require('mysql2'),
+    formatDate = require('date-and-time'),
     dotenv = require('dotenv').config()
-const {log} = require("qrcode/lib/core/galois-field");
-    formatDate = require('date-and-time')
 ;
 
 const connection = mysql.createConnection({
@@ -60,16 +59,20 @@ app.get('/', (req, res) => {
 });
 
 app.get('/products', (req, res) => {
-   res.status(200).json(productsImportedJson);
+    if (checkSessionToken(req.body.uuid)) {
+        return;
+    }
+    res.status(200).json(productsImportedJson);
 });
 
 app.get('/products/:id', (req, res) => {
-    const
-        id = req.params.id,
-        product = productsImportedJson.find(product => product.id === id)
-    ;
-
-    res.status(200).json(product);
+    if (checkSessionToken(req.body.uuid)) {
+        const
+            id = req.params.id,
+            product = productsImportedJson.find(product => product.id === id)
+        ;
+        res.status(200).json(product);
+    }
 });
 
 app.get('/products/:id/stock', (req, res) => {
@@ -84,15 +87,6 @@ app.get('/products/:id/stock', (req, res) => {
 app.get('/customers', (req, res) => {
     res.status(200).json(customersImportedJson);
 });
-
-// app.get('/customers/:id', (req, res) => {
-//     const
-//         id = req.params.id,
-//         customer = customersImportedJson.find(customer => customer.id === id)
-//     ;
-//
-//     res.status(200).json(customer);
-// });
 
 app.get('/customers/:id/orders', (req, res) => {
     const
@@ -136,7 +130,7 @@ function createAuthenticationUrl(user) {
        });
     });
 
-    return `http://10.60.121.88:3000/login/verification?uuid=${uuidToken}&user=${user}`;
+    return 'http://' + process.env.DB_HOST + `:${PORT}/login/verification?uuid=${uuidToken}&user=${user}`;
 }
 
 // Endpoint to login and generate a token
@@ -182,8 +176,8 @@ app.post('/login', (req, res) => {
         });
 
         let mailOptions = {
-            from: 'matin.nasirpour@epsi.fr',
-            to: ['matin.nasirpour@epsi.fr', email],
+            from: process.env.EMAIL_USER,
+            to: [process.env.EMAIL_USER, email],
             subject: `Sending Email using Nodemailer`,
             html: '<img src="'+ qrCode + '" alt="missing qr code">'
         };
@@ -233,13 +227,13 @@ app.get('/login/verification', (req, res) => {
                             console.log("[mysql error]", err.stack);
                         }});
                     res.status(200).json("User authenticated");
+
                 }else {
                     return res.status(401).json("Token expired")
                 }
             }
         }
 
-        connection.end();
     });
 })
 
@@ -249,29 +243,25 @@ function checkSessionToken(uuid) {
 
     connection.query(tokenRequest, uuid, function (err, rows, fields) {
         if (err) {
-            console.log("[mysql error]", err.stack);
+            return Boolean(false);
         }
 
         if (rows.length === 0) {
-            return false;
+            return Boolean(false);
         } else {
             if (rows[0].uuid_token === uuid) {
 
                 const
                     expirationTime = rows[0].expiration_time,
-                    creationDate = rows[0].creation_date
-                ;
+                    creationDate = rows[0].creation_date;
 
-                if (creationDate.valueOf() < expirationTime.valueOf()) {
-                    return true;
-                } else {
-                    return false;
-                }
+                return Boolean(creationDate.valueOf() < expirationTime.valueOf());
             }
-        }
-    });
+        }}
+        )
 
 }
+
 
 app.listen(3000, () => {
     console.log(`Server listening on port ${PORT}!`);
